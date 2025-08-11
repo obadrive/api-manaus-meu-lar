@@ -36,10 +36,10 @@ class CreateProtocolosTable extends Migration
             BEFORE UPDATE ON protocolos
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('status', 'idx_protocolos_status');
+        ');        // Criar índices
+        Schema::table('protocolos', function (Blueprint $table) {
+            $table->index('status', 'idx_protocolos_status');
+        });
     }
 
     /**

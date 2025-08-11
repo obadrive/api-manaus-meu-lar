@@ -36,7 +36,9 @@ class CreateUsuariosTable extends Migration
         ');
 
         // Criar índice para role
-        $table->index('role', 'idx_usuarios_role');
+        Schema::table('usuarios', function (Blueprint $table) {
+            $table->index('role', 'idx_usuarios_role');
+        });
     }
 
     /**

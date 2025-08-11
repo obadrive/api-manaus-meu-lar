@@ -31,10 +31,10 @@ class CreateTransacoesGoCoinsTable extends Migration
             BEFORE UPDATE ON transacoes_go_coins
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_transacoes_go_coins_usuario_id');
+        ');        // Criar índices
+        Schema::table('transacoes_go_coins', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_transacoes_go_coins_usuario_id');
+        });
     }
 
     /**

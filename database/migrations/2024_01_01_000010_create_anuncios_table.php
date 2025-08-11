@@ -47,7 +47,9 @@ class CreateAnunciosTable extends Migration
         ');
 
         // Criar índices
-        $table->index('categoria_id', 'idx_anuncios_categoria_id');
+        Schema::table('anuncios', function (Blueprint $table) {
+            $table->index('categoria_id', 'idx_anuncios_categoria_id');
+        });
         DB::statement('CREATE INDEX idx_anuncios_localizacao ON anuncios USING GIST (localizacao)');
     }
 

@@ -33,10 +33,10 @@ class CreateInteracoesPostagensTable extends Migration
             BEFORE UPDATE ON interacoes_postagens
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('postagem_id', 'idx_interacoes_postagens_postagem_id');
+        ');        // Criar índices
+        Schema::table('interacoes_postagens', function (Blueprint $table) {
+            $table->index('postagem_id', 'idx_interacoes_postagens_postagem_id');
+        });
     }
 
     /**

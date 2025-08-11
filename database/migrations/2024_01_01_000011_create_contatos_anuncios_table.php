@@ -31,10 +31,10 @@ class CreateContatosAnunciosTable extends Migration
             BEFORE UPDATE ON contatos_anuncios
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('anuncio_id', 'idx_contatos_anuncios_anuncio_id');
+        ');        // Criar índices
+        Schema::table('contatos_anuncios', function (Blueprint $table) {
+            $table->index('anuncio_id', 'idx_contatos_anuncios_anuncio_id');
+        });
     }
 
     /**

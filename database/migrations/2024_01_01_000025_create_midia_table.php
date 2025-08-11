@@ -30,10 +30,10 @@ class CreateMidiaTable extends Migration
             BEFORE UPDATE ON midia
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('entidade_id', 'idx_midia_entidade_id');
+        ');        // Criar índices
+        Schema::table('midia', function (Blueprint $table) {
+            $table->index('entidade_id', 'idx_midia_entidade_id');
+        });
     }
 
     /**

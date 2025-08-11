@@ -32,10 +32,10 @@ class CreateUsuariosConquistasTable extends Migration
             BEFORE UPDATE ON usuarios_conquistas
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_usuarios_conquistas_usuario_id');
+        ');        // Criar índices
+        Schema::table('usuarios_conquistas', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_usuarios_conquistas_usuario_id');
+        });
     }
 
     /**

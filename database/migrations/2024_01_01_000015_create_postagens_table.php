@@ -40,7 +40,9 @@ class CreatePostagensTable extends Migration
         ');
 
         // Criar índices
-        $table->index('tipo', 'idx_postagens_tipo');
+        Schema::table('postagens', function (Blueprint $table) {
+            $table->index('tipo', 'idx_postagens_tipo');
+        });
         DB::statement('CREATE INDEX idx_postagens_localizacao ON postagens USING GIST (localizacao)');
     }
 

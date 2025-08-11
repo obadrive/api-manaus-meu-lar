@@ -31,10 +31,10 @@ class CreateMapasOfflineTable extends Migration
             BEFORE UPDATE ON mapas_offline
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_mapas_offline_usuario_id');
+        ');        // Criar índices
+        Schema::table('mapas_offline', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_mapas_offline_usuario_id');
+        });
     }
 
     /**

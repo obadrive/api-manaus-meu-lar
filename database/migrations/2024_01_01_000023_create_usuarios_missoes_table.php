@@ -33,10 +33,10 @@ class CreateUsuariosMissoesTable extends Migration
             BEFORE UPDATE ON usuarios_missoes
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_usuarios_missoes_usuario_id');
+        ');        // Criar índices
+        Schema::table('usuarios_missoes', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_usuarios_missoes_usuario_id');
+        });
     }
 
     /**

@@ -27,7 +27,7 @@ class CreateAvaliacoesAnunciosTable extends Migration
             $table->foreign('usuario_id')->references('id')->on('usuarios');
             
             // Constraint para nota entre 1 e 5
-            $table->check('nota >= 1 AND nota <= 5');
+            // $table->check('nota >= 1 AND nota <= 5'); // Removido - método não existe no Laravel
         });
 
         // Criar trigger para updated_at
@@ -36,10 +36,10 @@ class CreateAvaliacoesAnunciosTable extends Migration
             BEFORE UPDATE ON avaliacoes_anuncios
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('anuncio_id', 'idx_avaliacoes_anuncios_anuncio_id');
+        ');        // Criar índices
+        Schema::table('avaliacoes_anuncios', function (Blueprint $table) {
+            $table->index('anuncio_id', 'idx_avaliacoes_anuncios_anuncio_id');
+        });
     }
 
     /**

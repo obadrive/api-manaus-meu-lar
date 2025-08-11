@@ -24,10 +24,10 @@ class CreateLogsAcaoTable extends Migration
             $table->timestamp('created_at')->useCurrent();
             
             $table->foreign('usuario_id')->references('id')->on('usuarios');
+        });        // Criar índices
+        Schema::table('logs_acao', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_logs_acao_usuario_id');
         });
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_logs_acao_usuario_id');
     }
 
     /**

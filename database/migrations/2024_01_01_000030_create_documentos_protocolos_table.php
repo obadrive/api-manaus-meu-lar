@@ -31,10 +31,10 @@ class CreateDocumentosProtocolosTable extends Migration
             BEFORE UPDATE ON documentos_protocolos
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('protocolo_id', 'idx_documentos_protocolos_protocolo_id');
+        ');        // Criar índices
+        Schema::table('documentos_protocolos', function (Blueprint $table) {
+            $table->index('protocolo_id', 'idx_documentos_protocolos_protocolo_id');
+        });
     }
 
     /**

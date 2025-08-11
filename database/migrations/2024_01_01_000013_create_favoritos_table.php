@@ -31,10 +31,10 @@ class CreateFavoritosTable extends Migration
             BEFORE UPDATE ON favoritos
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('usuario_id', 'idx_favoritos_usuario_id');
+        ');        // Criar índices
+        Schema::table('favoritos', function (Blueprint $table) {
+            $table->index('usuario_id', 'idx_favoritos_usuario_id');
+        });
     }
 
     /**

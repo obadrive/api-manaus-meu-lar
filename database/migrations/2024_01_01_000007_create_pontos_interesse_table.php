@@ -39,7 +39,9 @@ class CreatePontosInteresseTable extends Migration
         ');
 
         // Criar índices
-        $table->index('categoria_id', 'idx_pontos_interesse_categoria_id');
+        Schema::table('pontos_interesse', function (Blueprint $table) {
+            $table->index('categoria_id', 'idx_pontos_interesse_categoria_id');
+        });
         DB::statement('CREATE INDEX idx_pontos_interesse_localizacao ON pontos_interesse USING GIST (localizacao)');
     }
 

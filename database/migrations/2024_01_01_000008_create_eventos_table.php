@@ -46,7 +46,9 @@ class CreateEventosTable extends Migration
         ');
 
         // Criar índices
-        $table->index('data_inicio', 'idx_eventos_data_inicio');
+        Schema::table('eventos', function (Blueprint $table) {
+            $table->index('data_inicio', 'idx_eventos_data_inicio');
+        });
         DB::statement('CREATE INDEX idx_eventos_localizacao ON eventos USING GIST (localizacao)');
     }
 

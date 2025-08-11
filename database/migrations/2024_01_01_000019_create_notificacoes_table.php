@@ -31,10 +31,10 @@ class CreateNotificacoesTable extends Migration
             BEFORE UPDATE ON notificacoes
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column()
-        ');
-
-        // Criar índice
-        $table->index('lida', 'idx_notificacoes_lida');
+        ');        // Criar índices
+        Schema::table('notificacoes', function (Blueprint $table) {
+            $table->index('lida', 'idx_notificacoes_lida');
+        });
     }
 
     /**
