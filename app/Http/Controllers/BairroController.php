@@ -2,34 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\BairroRequest;
-use App\Http\Resources\BairroResource;
-use App\Services\BairroService;
+use App\Models\Bairro;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class BairroController extends Controller
 {
-    public function __construct(
-        private BairroService $bairroService
-    ) {}
-
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request): JsonResponse
     {
         try {
-            $filtros = $request->only(['nome', 'lat', 'lng', 'raio']);
-            $perPage = $request->get('per_page', 15);
+            $query = Bairro::query();
             
-            $bairros = $this->bairroService->listarBairros($filtros, $perPage);
-
+            // Filtros
+            if ($request->has('nome')) {
+                $query->where('nome', 'like', '%' . $request->nome . '%');
+            }
+            
+            // Geolocalização
+            if ($request->has('lat') && $request->has('lng')) {
+                $raio = $request->get('raio', 5000);
+                $query->proximos($request->lat, $request->lng, $raio);
+            }
+            
+            $perPage = $request->get('per_page', 15);
+            $bairros = $query->paginate($perPage);
+            
             return response()->json([
                 'success' => true,
-                'data' => BairroResource::collection($bairros->items()),
+                'data' => $bairros->items(),
                 'pagination' => [
                     'current_page' => $bairros->currentPage(),
                     'last_page' => $bairros->lastPage(),
@@ -47,19 +48,37 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(BairroRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         try {
-            $bairro = $this->bairroService->criarBairro($request->validated());
+            $request->validate([
+                'nome' => 'required|string|max:255',
+                'geometria' => 'required|array',
+                'geometria.type' => 'required|string|in:Polygon',
+                'geometria.coordinates' => 'required|array',
+            ]);
+
+            $dados = $request->all();
+            
+            if (isset($dados['geometria'])) {
+                $geometria = json_encode($dados['geometria']);
+                $dados['geometria'] = DB::raw("ST_GeomFromGeoJSON('{$geometria}')");
+            }
+
+            $bairro = Bairro::create($dados);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bairro criado com sucesso',
-                'data' => new BairroResource($bairro)
+                'data' => $bairro
             ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors()
+            ], 422);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -70,24 +89,22 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id): JsonResponse
     {
         try {
-            $bairro = $this->bairroService->buscarPorId($id);
+            $bairro = Bairro::find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => new BairroResource($bairro)
+                'data' => $bairro
             ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bairro não encontrado'
-            ], 404);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -98,25 +115,46 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(BairroRequest $request, string $id): JsonResponse
+    public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $bairro = $this->bairroService->atualizarBairro($id, $request->validated());
+            $bairro = Bairro::find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
+
+            $request->validate([
+                'nome' => 'sometimes|string|max:255',
+                'geometria' => 'sometimes|array',
+                'geometria.type' => 'required_with:geometria|string|in:Polygon',
+                'geometria.coordinates' => 'required_with:geometria|array',
+            ]);
+
+            $dados = $request->all();
+
+            if (isset($dados['geometria'])) {
+                $geometria = json_encode($dados['geometria']);
+                $dados['geometria'] = DB::raw("ST_GeomFromGeoJSON('{$geometria}')");
+            }
+
+            $bairro->update($dados);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bairro atualizado com sucesso',
-                'data' => new BairroResource($bairro)
+                'data' => $bairro
             ], 200);
 
-        } catch (ModelNotFoundException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Bairro não encontrado'
-            ], 404);
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors()
+            ], 422);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -127,24 +165,24 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id): JsonResponse
     {
         try {
-            $this->bairroService->removerBairro($id);
+            $bairro = Bairro::find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
+
+            $bairro->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bairro removido com sucesso'
             ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bairro não encontrado'
-            ], 404);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -155,31 +193,32 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Restaurar bairro removido (soft delete)
-     */
     public function restore(string $id): JsonResponse
     {
         try {
-            $bairro = $this->bairroService->restaurarBairro($id);
+            $bairro = Bairro::withTrashed()->find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
+
+            if (!$bairro->trashed()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não está removido'
+                ], 400);
+            }
+
+            $bairro->restore();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bairro restaurado com sucesso',
-                'data' => new BairroResource($bairro)
+                'data' => $bairro
             ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bairro não encontrado'
-            ], 404);
-
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -190,37 +229,53 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Buscar bairros por proximidade
-     */
-    public function proximos(Request $request): JsonResponse
+    public function proximos(Request $request, string $id): JsonResponse
     {
         try {
+            $bairro = Bairro::find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
+
             $request->validate([
-                'lat' => 'required|numeric|between:-90,90',
-                'lng' => 'required|numeric|between:-180,180',
-                'raio' => 'sometimes|numeric|min:100|max:50000', // 100m a 50km
+                'raio' => 'sometimes|numeric|min:100|max:50000',
             ]);
 
-            $raio = $request->get('raio', 5000); // 5km padrão
+            $raio = $request->get('raio', 5000);
             
-            $bairros = $this->bairroService->buscarPorProximidade(
-                $request->lat, 
-                $request->lng, 
-                $raio
-            );
+            // Extrair coordenadas do centro do bairro
+            $centro = DB::select("SELECT ST_X(ST_Centroid(geometria)) as lng, ST_Y(ST_Centroid(geometria)) as lat FROM bairros WHERE id = ?", [$id]);
+            
+            if (empty($centro)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Não foi possível calcular o centro do bairro'
+                ], 400);
+            }
+
+            $lat = $centro[0]->lat;
+            $lng = $centro[0]->lng;
+
+            $bairrosProximos = Bairro::proximos($lat, $lng, $raio)
+                ->where('id', '!=', $id)
+                ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => BairroResource::collection($bairros),
+                'data' => $bairrosProximos,
                 'params' => [
-                    'lat' => $request->lat,
-                    'lng' => $request->lng,
+                    'bairro_id' => $id,
+                    'lat' => $lat,
+                    'lng' => $lng,
                     'raio' => $raio
                 ]
             ], 200);
 
-        } catch (ValidationException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Dados inválidos',
@@ -236,99 +291,69 @@ class BairroController extends Controller
         }
     }
 
-    /**
-     * Obter estatísticas dos bairros
-     */
-    public function estatisticas(): JsonResponse
+    public function estatisticas(string $id): JsonResponse
     {
         try {
-            $estatisticas = $this->bairroService->obterEstatisticas();
+            $bairro = Bairro::find($id);
+            
+            if (!$bairro) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bairro não encontrado'
+                ], 404);
+            }
+
+            // Contar usuários no bairro
+            $totalUsuarios = DB::table('usuarios')->where('bairro_id', $id)->count();
+            $usuariosAtivos = DB::table('usuarios')->where('bairro_id', $id)->where('ativo', true)->count();
+            
+            // Contar pontos de interesse
+            $totalPontosInteresse = DB::table('pontos_interesse')->where('bairro_id', $id)->count();
+            $pontosAtivos = DB::table('pontos_interesse')->where('bairro_id', $id)->where('ativo', true)->count();
+            
+            // Contar eventos
+            $totalEventos = DB::table('eventos')->where('bairro_id', $id)->count();
+            $eventosFuturos = DB::table('eventos')->where('bairro_id', $id)->where('data_inicio', '>=', now()->toDateString())->count();
+            
+            // Contar anúncios
+            $totalAnuncios = DB::table('anuncios')->where('bairro_id', $id)->count();
+            $anunciosAtivos = DB::table('anuncios')->where('bairro_id', $id)->where('ativo', true)->count();
+            
+            // Contar postagens
+            $totalPostagens = DB::table('postagens')->where('bairro_id', $id)->count();
+            $postagensAtivas = DB::table('postagens')->where('bairro_id', $id)->where('ativo', true)->count();
 
             return response()->json([
                 'success' => true,
-                'data' => $estatisticas
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erro ao obter estatísticas',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Listar bairros com contagem de usuários
-     */
-    public function comContagemUsuarios(Request $request): JsonResponse
-    {
-        try {
-            $perPage = $request->get('per_page', 15);
-            $bairros = $this->bairroService->listarComContagemUsuarios($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data' => BairroResource::collection($bairros->items()),
-                'pagination' => [
-                    'current_page' => $bairros->currentPage(),
-                    'last_page' => $bairros->lastPage(),
-                    'per_page' => $bairros->perPage(),
-                    'total' => $bairros->total(),
+                'data' => [
+                    'bairro' => $bairro,
+                    'usuarios' => [
+                        'total' => $totalUsuarios,
+                        'ativos' => $usuariosAtivos
+                    ],
+                    'pontos_interesse' => [
+                        'total' => $totalPontosInteresse,
+                        'ativos' => $pontosAtivos
+                    ],
+                    'eventos' => [
+                        'total' => $totalEventos,
+                        'futuros' => $eventosFuturos
+                    ],
+                    'anuncios' => [
+                        'total' => $totalAnuncios,
+                        'ativos' => $anunciosAtivos
+                    ],
+                    'postagens' => [
+                        'total' => $totalPostagens,
+                        'ativas' => $postagensAtivas
+                    ]
                 ]
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao listar bairros com contagem',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Buscar bairros por região (bounding box)
-     */
-    public function porRegiao(Request $request): JsonResponse
-    {
-        try {
-            $request->validate([
-                'min_lat' => 'required|numeric|between:-90,90',
-                'max_lat' => 'required|numeric|between:-90,90|gte:min_lat',
-                'min_lng' => 'required|numeric|between:-180,180',
-                'max_lng' => 'required|numeric|between:-180,180|gte:min_lng',
-            ]);
-
-            $bairros = $this->bairroService->buscarPorRegiao(
-                $request->min_lat,
-                $request->max_lat,
-                $request->min_lng,
-                $request->max_lng
-            );
-
-            return response()->json([
-                'success' => true,
-                'data' => BairroResource::collection($bairros),
-                'params' => [
-                    'min_lat' => $request->min_lat,
-                    'max_lat' => $request->max_lat,
-                    'min_lng' => $request->min_lng,
-                    'max_lng' => $request->max_lng,
-                ]
-            ], 200);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Dados inválidos',
-                'errors' => $e->errors()
-            ], 422);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erro ao buscar bairros por região',
+                'message' => 'Erro ao obter estatísticas do bairro',
                 'error' => $e->getMessage()
             ], 500);
         }
