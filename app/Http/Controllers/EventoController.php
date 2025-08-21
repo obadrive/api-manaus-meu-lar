@@ -45,12 +45,14 @@ class EventoController extends Controller
             
             return response()->json([
                 'success' => true,
-                'data' => $eventos->items(),
-                'pagination' => [
-                    'current_page' => $eventos->currentPage(),
-                    'last_page' => $eventos->lastPage(),
-                    'per_page' => $eventos->perPage(),
-                    'total' => $eventos->total(),
+                'data' => [
+                    'data' => $eventos->items(),
+                    'pagination' => [
+                        'current_page' => $eventos->currentPage(),
+                        'last_page' => $eventos->lastPage(),
+                        'per_page' => $eventos->perPage(),
+                        'total' => $eventos->total(),
+                    ]
                 ]
             ], 200);
             
@@ -81,6 +83,14 @@ class EventoController extends Controller
 
             $dados = $request->all();
             $dados['status'] = $dados['status'] ?? 'pendente';
+
+            // Obter userId do cookie se não fornecido
+            if (!isset($dados['organizador_id'])) {
+                $userId = $request->cookie('user_id');
+                if ($userId) {
+                    $dados['organizador_id'] = $userId;
+                }
+            }
 
             $evento = Evento::create($dados);
             $evento->load(['bairro']);
@@ -159,6 +169,15 @@ class EventoController extends Controller
             ]);
 
             $dados = $request->all();
+
+            // Obter userId do cookie se não fornecido
+            if (!isset($dados['organizador_id'])) {
+                $userId = $request->cookie('user_id');
+                if ($userId) {
+                    $dados['organizador_id'] = $userId;
+                }
+            }
+
             $evento->update($dados);
             $evento->load(['bairro']);
 

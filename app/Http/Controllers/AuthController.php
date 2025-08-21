@@ -32,6 +32,7 @@ class AuthController extends Controller
             ]);
 
             $token = $usuario->createToken('auth_token')->plainTextToken;
+            $refreshToken = $usuario->createToken('refresh_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -39,7 +40,9 @@ class AuthController extends Controller
                 'data' => [
                     'usuario' => $usuario,
                     'token' => $token,
-                    'token_type' => 'Bearer'
+                    'token_type' => 'Bearer',
+                    'refresh_token' => $refreshToken,
+                    'expires_in' => 3600 // 1 hora
                 ]
             ], 201);
 
@@ -80,16 +83,25 @@ class AuthController extends Controller
             }
 
             $token = $usuario->createToken('auth_token')->plainTextToken;
+            $refreshToken = $usuario->createToken('refresh_token')->plainTextToken;
 
-            return response()->json([
+            $response = response()->json([
                 'success' => true,
                 'message' => 'Login realizado com sucesso',
                 'data' => [
                     'usuario' => $usuario,
                     'token' => $token,
-                    'token_type' => 'Bearer'
+                    'token_type' => 'Bearer',
+                    'refresh_token' => $refreshToken,
+                    'expires_in' => 3600 // 1 hora
                 ]
             ], 200);
+
+            // Adicionar cookies
+            $response->cookie('user_id', $usuario->id, 60 * 24 * 30); // 30 dias
+            $response->cookie('auth_token', $token, 60 * 24 * 30); // 30 dias
+
+            return $response;
 
         } catch (ValidationException $e) {
             return response()->json([
@@ -115,10 +127,16 @@ class AuthController extends Controller
         try {
             $request->user()->currentAccessToken()->delete();
 
-            return response()->json([
+            $response = response()->json([
                 'success' => true,
                 'message' => 'Logout realizado com sucesso'
             ], 200);
+
+            // Remover cookies
+            $response->cookie('user_id', '', -1);
+            $response->cookie('auth_token', '', -1);
+
+            return $response;
 
         } catch (\Exception $e) {
             return response()->json([
@@ -146,6 +164,66 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao fazer logout de todos os dispositivos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Renovar token de acesso
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'refresh_token' => 'required|string',
+            ]);
+
+            // Busca o token no banco de dados
+            $token = \Laravel\Sanctum\PersonalAccessToken::findToken($request->refresh_token);
+            
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Refresh token inválido'
+                ], 401);
+            }
+
+            $usuario = $token->tokenable;
+            
+            if (!$usuario) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não encontrado'
+                ], 401);
+            }
+
+            // Revoga o token antigo
+            $token->delete();
+
+            // Cria um novo token
+            $newToken = $usuario->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Token renovado com sucesso',
+                'data' => [
+                    'token' => $newToken,
+                    'expires_in' => 3600 // 1 hora
+                ]
+            ], 200);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao renovar token',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -306,6 +384,47 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao revogar token',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter userId do cookie
+     */
+    public function getUserId(Request $request): JsonResponse
+    {
+        try {
+            $userId = $request->cookie('user_id');
+
+            if (!$userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            $usuario = Usuario::find($userId);
+
+            if (!$usuario) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'user_id' => $userId,
+                    'usuario' => $usuario
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao obter userId',
                 'error' => $e->getMessage()
             ], 500);
         }
